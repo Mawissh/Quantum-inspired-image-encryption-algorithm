@@ -1,0 +1,75 @@
+%% LSB Embedding procedure ::::::::::::::
+
+cover_path  = 'D:\Quantum_third_paper\Paper\Code\code\Encryption_code\Image\2.2.01.tiff';  % Your 1024x1024 RGB cover
+
+%% ================== 1. Load images ==================
+secret = Enc_nEw;
+if size(secret,3)==3, secret = rgb2gray(secret); end
+secret = imresize(secret, [512 512]);
+secret = uint8(secret);
+
+cover = imread(cover_path);
+cover = imresize(cover, [1024 1024]);
+if size(cover,3)==1, cover = cat(3,cover,cover,cover); end
+cover = uint8(cover);
+
+[Hc,Wc,~] = size(cover);  % 1024 x 1024
+[Hs,Ws]   = size(secret); % 512 x 512
+fprintf('Secret: %d x %d | Cover: %d x %d\n', Hs, Ws, Hc, Wc);
+
+%% ================== 2. QE helper ==================
+QE = @(yc,xc,yw,xw) (yc==yw) && (xc==xw);
+
+%% ================== 3. Expand 512x512 → 1024x1024 (2-bit pixels) ==================
+expanded = zeros(1024,1024,'uint8');  % 0..3
+
+for i = 1:Hs
+    for j = 1:Ws
+        s = secret(i,j);
+        s7=bitget(s,8); s6=bitget(s,7); s5=bitget(s,6); s4=bitget(s,5);
+        s3=bitget(s,4); s2=bitget(s,3); s1=bitget(s,2); s0=bitget(s,1);
+
+        p1 = uint8(s7*2 + s6);  p2 = uint8(s5*2 + s4);
+        p3 = uint8(s3*2 + s2);  p4 = uint8(s1*2 + s0);
+
+        ii = 2*i-1;  jj = 2*j-1;
+        expanded(ii,   jj)   = p1;
+        expanded(ii,   jj+1) = p2;
+        expanded(ii+1, jj)   = p3;
+        expanded(ii+1, jj+1) = p4;
+    end
+end
+
+%% ================== 4. Optimal Color Embedding (QE controlled) ==================
+stego = cover;
+
+for y = 1:Hc
+    for x = 1:Wc
+        if ~QE(y,x,y,x), continue; end   % r_flag = 1 always here
+
+        w_val = expanded(y,x);
+        w1 = bitget(w_val,2);   % higher bit
+        w0 = bitget(w_val,1);   % lower bit
+
+        R = stego(y,x,1);  G = stego(y,x,2);  B = stego(y,x,3);
+        r0 = bitget(R,1);  g0 = bitget(G,1);  b0 = bitget(B,1);
+
+        a1 = xor(r0,g0);   % current w1
+        a0 = xor(g0,b0);   % current w0
+
+        if (w1==a1) && (w0==a0)
+            % perfect
+        elseif (w1==a1) && (w0~=a0)
+            b0 = 1-b0;                     % flip B only
+        elseif (w1~=a1) && (w0==a0)
+            r0 = 1-r0;                     % flip R only
+        else
+            g0 = 1-g0;                     % flip G → fixes both
+        end
+
+        stego(y,x,1) = bitset(R,1,r0);
+        stego(y,x,2) = bitset(G,1,g0);
+        stego(y,x,3) = bitset(B,1,b0);
+    end
+end
+imwrite(stego,'D:\Quantum_third_paper\Paper\Code\code\Encryption_code\Image\Encr_image\check_folderdata\cecumone_2.2.01stego.png');
