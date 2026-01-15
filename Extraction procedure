@@ -1,0 +1,32 @@
+%% ================== 5. Blind Extraction ==================
+expanded_rec = zeros(1024,1024,'uint8');
+for y = 1:Hc
+    for x = 1:Wc
+        r0 = bitget(stego(y,x,1),1);
+        g0 = bitget(stego(y,x,2),1);
+        b0 = bitget(stego(y,x,3),1);
+        w1_hat = xor(r0,g0);
+        w0_hat = xor(g0,b0);
+        expanded_rec(y,x) = uint8(w1_hat*2 + w0_hat);
+    end
+end
+
+%% ================== 6. Collapse back to 512x512 secret ==================
+secret_rec = zeros(512,512,'uint8');
+for i = 1:Hs
+    for j = 1:Ws
+        ii = 2*i-1;  jj = 2*j-1;
+        p1 = expanded_rec(ii,   jj);     p2 = expanded_rec(ii,   jj+1);
+        p3 = expanded_rec(ii+1, jj);     p4 = expanded_rec(ii+1, jj+1);
+
+        s7=bitget(p1,2); s6=bitget(p1,1); s5=bitget(p2,2); s4=bitget(p2,1);
+        s3=bitget(p3,2); s2=bitget(p3,1); s1=bitget(p4,2); s0=bitget(p4,1);
+
+        val = s7*128 + s6*64 + s5*32 + s4*16 + s3*8 + s2*4 + s1*2 + s0;
+        secret_rec(i,j) = uint8(val);
+    end
+end
+
+
+%% Save the recovered secret image::::
+imwrite(secret_rec,'D:\Quantum_third_paper\Paper\Code\code\Encryption_code\Image\Encr_image\check_folderdata\rec_cecumone_2.2.01stego.png');
